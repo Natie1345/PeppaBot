@@ -1,44 +1,49 @@
 #include "rclcpp/rclcpp.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
-#include "std_msgs/msg/string.hpp"
-#include <opencv2/opencv.hpp>
+#include "geometry_msgs/msg/twist.hpp"
 #include <vector>
 
 class PeppaBotNode : public rclcpp::Node {
 public:
     PeppaBotNode() : Node("peppabot_node"), goal_index_(0), object_detected_(false) {
+        // Define the cylinder coordinates as goal positions
         goals_ = {
-            createGoalPose(2.0, 3.0, 0.0, 1.0),  // Example coordinates for book 1
-            createGoalPose(3.5, -2.0, 0.0, 1.0), // Example coordinates for book 2
-            createGoalPose(5.0, 2.0, 0.0, 1.0),  // Example coordinates for book 3
-            createGoalPose(1.0, 4.0, 0.0, 1.0)   // Example coordinates for book 4
+            createGoalPose(0.668685, 2.58418, 0.0, 1.0),
+            createGoalPose(5.16823, 1.32238, 0.0, 1.0),
+            createGoalPose(5.20808, 0.112293, 0.0, 1.0),
+            createGoalPose(5.09059, -1.67338, 0.0, 1.0),
+            createGoalPose(5.09703, -2.50786, 0.0, 1.0),
+            createGoalPose(0.888802, -3.96757, 0.0, 1.0),
+            createGoalPose(1.66056, 0.741782, 0.0, 1.0),
+            createGoalPose(0.69425, -1.69643, 0.0, 1.0),
+            createGoalPose(2.50555, -1.69839, 0.0, 1.0)
         };
 
-        starting_point_ = createGoalPose(0.0, 0.0, 0.0, 1.0);  // Starting point coordinates
+        // Publishers and subscribers for TurtleBot3-related topics
+        goal_publisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/navigate_to_pose/goal", 10);
+        cmd_vel_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);        // Velocity commands
 
-        // Publisher for navigation goals
-        goal_publisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("navigate_to_pose/goal", 10);
-
-        book_selection_sub_ = this->create_subscription<std_msgs::msg::String>(
-            "/selected_book", 10, std::bind(&PeppaBotNode::bookSelectionCallback, this, std::placeholders::_1));
-
+        // Subscribe to laser scan data for detecting obstacles
         laser_scan_subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-            "scan", 10, std::bind(&PeppaBotNode::laserScanCallback, this, std::placeholders::_1));
+            "/scan", 10, std::bind(&PeppaBotNode::laserScanCallback, this, std::placeholders::_1));
+
+        // Start navigating to the first goal
+        sendGoal(goals_[goal_index_]);
     }
 
 private:
     std::vector<geometry_msgs::msg::PoseStamped> goals_;
-    geometry_msgs::msg::PoseStamped starting_point_;
     size_t goal_index_;
     bool object_detected_;
+
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_publisher_;
-    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr book_selection_sub_;
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_scan_subscriber_;
 
     geometry_msgs::msg::PoseStamped createGoalPose(double x, double y, double orientation_z, double orientation_w) {
         geometry_msgs::msg::PoseStamped goal_pose;
-        goal_pose.header.frame_id = "map";
+        goal_pose.header.frame_id = "map";  // Ensuring it's in the "map" frame
         goal_pose.header.stamp = this->now();
         goal_pose.pose.position.x = x;
         goal_pose.pose.position.y = y;
@@ -47,67 +52,43 @@ private:
         return goal_pose;
     }
 
-    void bookSelectionCallback(const std_msgs::msg::String::SharedPtr msg) {
-        std::string selected_book = msg->data;
-
-        if (selected_book == "book1") {
-            goal_index_ = 0;
-        } else if (selected_book == "book2") {
-            goal_index_ = 1;
-        } else if (selected_book == "book3") {
-            goal_index_ = 2;
-        } else if (selected_book == "book4") {
-            goal_index_ = 3;
-        } else {
-            RCLCPP_ERROR(this->get_logger(), "Invalid book selection: %s", selected_book.c_str());
-            return;
-        }
-
-        RCLCPP_INFO(this->get_logger(), "Navigating to %s", selected_book.c_str());
-        sendGoal(goals_[goal_index_]);
-    }
-
     void laserScanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan) {
-        const float min_diameter = 0.3; // Minimum diameter of 30 cm
-        const float max_diameter = 1.0; // Maximum diameter limit
-        const float detection_range = 0.15; // Range tolerance for detection
+        // Detect objects using laser scan data
         bool object_detected_now = false;
 
         for (size_t i = 0; i < scan->ranges.size(); ++i) {
             float range = scan->ranges[i];
-            if (range < max_diameter + detection_range && range > min_diameter - detection_range) {
+            if (range < 1.0) {  // Object detected within 1 meter
                 object_detected_now = true;
-                float angle = scan->angle_min + i * scan->angle_increment;
-
-                // Create a new goal position to navigate around the detected object
-                adjustGoalForObstacle(angle);
                 break;
             }
         }
 
         if (object_detected_now && !object_detected_) {
-            RCLCPP_INFO(this->get_logger(), "Object detected, adjusting navigation.");
+            RCLCPP_INFO(this->get_logger(), "Object detected! Stopping to navigate around it.");
             object_detected_ = true;
+
+            // Take over and navigate around the object
+            avoidObstacle();
         } else if (!object_detected_now && object_detected_) {
             RCLCPP_INFO(this->get_logger(), "Object no longer detected, resuming navigation.");
             object_detected_ = false;
+            // Resume navigation towards the current goal
             sendGoal(goals_[goal_index_]);
         }
     }
 
-    void adjustGoalForObstacle(float angle) {
-        // Calculate new goal position to navigate around the obstacle
-        float obstacle_distance = 0.5; // Distance to maintain from the obstacle
-        float new_x = goals_[goal_index_].pose.position.x + obstacle_distance * cos(angle + M_PI_2); // Shift right
-        float new_y = goals_[goal_index_].pose.position.y + obstacle_distance * sin(angle + M_PI_2); // Shift up
-
-        RCLCPP_INFO(this->get_logger(), "Adjusting goal to (%.2f, %.2f)", new_x, new_y);
-        sendGoal(createGoalPose(new_x, new_y, 0.0, 1.0)); // Send new goal
+    void avoidObstacle() {
+        geometry_msgs::msg::Twist cmd_vel_msg;
+        cmd_vel_msg.linear.x = 0.0;  // Stop forward movement
+        cmd_vel_msg.angular.z = 0.5;  // Rotate to navigate around the obstacle
+        cmd_vel_publisher_->publish(cmd_vel_msg);
+        RCLCPP_INFO(this->get_logger(), "Navigating around the obstacle.");
     }
 
     void sendGoal(const geometry_msgs::msg::PoseStamped &goal_pose) {
         goal_publisher_->publish(goal_pose);
-        RCLCPP_INFO(this->get_logger(), "Published goal: [%f, %f]", goal_pose.pose.position.x, goal_pose.pose.position.y);
+        RCLCPP_INFO(this->get_logger(), "Published goal: [%.2f, %.2f]", goal_pose.pose.position.x, goal_pose.pose.position.y);
     }
 };
 

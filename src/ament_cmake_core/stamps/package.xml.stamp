@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>peppabot</name>
+  <version>0.0.1</version>
+  <description>peppaBot path planning and navigation package</description>
+
+  <maintainer email="katie.e.forster@student.uts.edu.au">Katie E. Forster</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Dependencies required at build time -->
+  <build_depend>rclcpp</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>nav2_common</build_depend>
+  <build_depend>nav2_msgs</build_depend> <!-- Kept this line for nav2_msgs -->
+  <build_depend>OpenCV</build_depend> <!-- Added this line for OpenCV -->
+
+  <!-- Dependencies required at runtime -->
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav2_common</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend> <!-- Kept this line for nav2_msgs -->
+  <exec_depend>OpenCV</exec_depend> <!-- Added this line for OpenCV -->
+
+  <!-- Export section -->
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
+

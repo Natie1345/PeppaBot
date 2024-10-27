@@ -1,0 +1,10 @@
+/home/student/ros2_ws/peppabot/src/CMakeFiles/uninstall.dir
+/home/student/ros2_ws/peppabot/src/CMakeFiles/peppabot_uninstall.dir
+/home/student/ros2_ws/peppabot/src/CMakeFiles/peppabot_node.dir
+/home/student/ros2_ws/peppabot/src/CMakeFiles/test.dir
+/home/student/ros2_ws/peppabot/src/CMakeFiles/edit_cache.dir
+/home/student/ros2_ws/peppabot/src/CMakeFiles/rebuild_cache.dir
+/home/student/ros2_ws/peppabot/src/CMakeFiles/list_install_components.dir
+/home/student/ros2_ws/peppabot/src/CMakeFiles/install.dir
+/home/student/ros2_ws/peppabot/src/CMakeFiles/install/local.dir
+/home/student/ros2_ws/peppabot/src/CMakeFiles/install/strip.dir
