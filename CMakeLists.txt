@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 cmake_minimum_required(VERSION 3.8)
 project(PeppaBot)
 
@@ -22,5 +23,32 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+=======
+cmake_minimum_required(VERSION 3.5)
+project(peppabot)
+
+# Find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(OpenCV REQUIRED)  # Find OpenCV
+
+# Add executable
+add_executable(peppabot_node src/peppabot_node.cpp)
+
+# Link libraries
+ament_target_dependencies(peppabot_node rclcpp geometry_msgs sensor_msgs)
+target_link_libraries(peppabot_node ${OpenCV_LIBS})  # Link OpenCV
+
+# Install executable
+install(TARGETS
+  peppabot_node
+  DESTINATION lib/${PROJECT_NAME})
+
+# Install launch files
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch)
+>>>>>>> c1743c8 (running node)
 
 ament_package()
